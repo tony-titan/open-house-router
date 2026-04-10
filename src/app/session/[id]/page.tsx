@@ -38,6 +38,9 @@ export default function SessionPage() {
   const [sortBy, setSortBy] = useState<'time' | 'price-asc' | 'price-desc' | 'address'>('time');
   const [highlightHouseId, setHighlightHouseId] = useState<number | null>(null);
   const [showExcluded, setShowExcluded] = useState(false);
+  const [timezone, setTimezone] = useState(() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'America/Los_Angeles'; }
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { requireAd } = useAdGate();
 
@@ -204,7 +207,7 @@ export default function SessionPage() {
           const res = await fetch(`/api/sessions/${sessionId}/upload`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rows }),
+            body: JSON.stringify({ rows, timezone }),
           });
           const data = await res.json();
           if (data.error) throw new Error(data.error);
@@ -709,6 +712,22 @@ export default function SessionPage() {
             </div>
           </div>
           <div className="mt-3">
+            <label className="text-xs text-gray-500 mb-1 block">Timezone</label>
+            <select
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+            >
+              {[
+                'America/New_York', 'America/Chicago', 'America/Denver',
+                'America/Los_Angeles', 'America/Phoenix', 'America/Anchorage',
+                'Pacific/Honolulu',
+              ].map((tz) => (
+                <option key={tz} value={tz}>{tz.replace('America/', '').replace('Pacific/', '').replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mt-3">
             <label className="text-xs text-gray-500 mb-1 block">
               Time per stop: <span className="font-semibold text-gray-700">{timePerStop} min</span>
             </label>
@@ -815,6 +834,11 @@ export default function SessionPage() {
                         {stop.travel_time_minutes > 0 && (
                           <span className="text-gray-400">{Math.round(stop.travel_time_minutes)} min drive</span>
                         )}
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        Open house: {new Date(stop.house.open_house_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        {' – '}
+                        {new Date(stop.house.open_house_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                       </div>
                     </div>
                   </div>
