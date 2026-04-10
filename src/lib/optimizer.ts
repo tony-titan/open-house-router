@@ -9,6 +9,7 @@ interface OptimizationInput {
   dayEndTime: Date;
   timePerStopMinutes: number;
   excludeHouseIds: number[];
+  claimedHouseIds?: number[];
   favoritedHouseIds?: number[];
 }
 
@@ -32,12 +33,14 @@ interface CandidateInfo {
   startMs: number;
   endMs: number;
   isFavorited: boolean;
+  isClaimed: boolean;
 }
 
 export async function optimizeRoute(input: OptimizationInput): Promise<OptimizationResult> {
-  const { houses, startLat, startLng, dayStartTime, dayEndTime, timePerStopMinutes, excludeHouseIds, favoritedHouseIds } = input;
+  const { houses, startLat, startLng, dayStartTime, dayEndTime, timePerStopMinutes, excludeHouseIds, claimedHouseIds, favoritedHouseIds } = input;
 
   const excludeSet = new Set(excludeHouseIds);
+  const claimedSet = new Set(claimedHouseIds || []);
   const favoritedSet = new Set(favoritedHouseIds || []);
   const dayStartMs = dayStartTime.getTime();
   const dayEndMs = dayEndTime.getTime();
@@ -49,7 +52,7 @@ export async function optimizeRoute(input: OptimizationInput): Promise<Optimizat
     const hStartMs = new Date(h.open_house_start).getTime();
     const hEndMs = new Date(h.open_house_end).getTime();
     if (hEndMs > dayStartMs && hStartMs < dayEndMs) {
-      candidates.push({ house: h, index: idx, startMs: hStartMs, endMs: hEndMs, isFavorited: favoritedSet.has(h.id) });
+      candidates.push({ house: h, index: idx, startMs: hStartMs, endMs: hEndMs, isFavorited: favoritedSet.has(h.id), isClaimed: claimedSet.has(h.id) });
     }
   });
 
@@ -153,7 +156,8 @@ function greedyOptimize(
 
       const urgency = remainingWindowMinutes < 30 ? 2.0 : remainingWindowMinutes < 60 ? 1.0 : 0.0;
       const favoriteBonus = cand.isFavorited ? 100 : 0;
-      const score = -travelMinutes * 1.0 - waitMinutes * 0.5 + urgency * 10 + favoriteBonus;
+      const claimedPenalty = cand.isClaimed ? -50 : 0;
+      const score = -travelMinutes * 1.0 - waitMinutes * 0.5 + urgency * 10 + favoriteBonus + claimedPenalty;
 
       if (score > bestScore) {
         bestScore = score;
