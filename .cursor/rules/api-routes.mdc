@@ -1,0 +1,41 @@
+---
+description: Next.js API route conventions
+globs: src/app/api/**/*.ts
+alwaysApply: false
+---
+
+# API Route Conventions
+
+## Pattern
+
+All API routes live under `src/app/api/sessions/`. Use Next.js App Router `route.ts` handlers.
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const { id } = params; // session ID from URL
+  const body = await req.json();
+  // ... use db functions from '@/lib/db'
+  return NextResponse.json(result);
+}
+```
+
+## Existing Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | /api/sessions | Create session |
+| GET | /api/sessions/[id] | Get full session data (houses, members, routes, preferences) |
+| POST | /api/sessions/[id]/upload | CSV upload (houses) |
+| POST/PUT | /api/sessions/[id]/members | Create/update member |
+| POST | /api/sessions/[id]/optimize | Generate optimized route |
+| DELETE | /api/sessions/[id]/routes/[routeId] | Delete a route |
+| GET/PUT | /api/sessions/[id]/preferences | Get/set house preferences |
+
+## Rules
+
+- Session ID comes from URL params, member ID comes from request body
+- Return `NextResponse.json({ error: '...' })` with appropriate status for errors
+- The main GET endpoint (`/api/sessions/[id]`) assembles the full `SessionData` object — update it when adding new data
+- Import database functions from `@/lib/db`, not the db instance directly

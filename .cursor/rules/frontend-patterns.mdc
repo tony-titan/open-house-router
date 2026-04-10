@@ -1,0 +1,53 @@
+---
+description: React component and UI patterns
+globs: "src/app/**/*.tsx, src/components/**/*.tsx"
+alwaysApply: false
+---
+
+# Frontend Patterns
+
+## Data Fetching
+
+All session data comes from a single SWR hook polling every 5 seconds:
+
+```typescript
+const { data, mutate } = useSWR<SessionData>(`/api/sessions/${sessionId}`, fetcher, {
+  refreshInterval: 5000,
+});
+```
+
+Call `mutate()` after any mutation to refresh immediately. Do NOT add separate SWR hooks for sub-resources.
+
+## Component Structure
+
+- `src/app/session/[id]/page.tsx` is the main session page — it's a single large client component with inner functions (`PlanTab`, `HousesTab`, `HouseCard`). This is intentional for shared state access.
+- `src/components/MapView.tsx` is dynamically imported with `ssr: false` (Leaflet requires browser APIs).
+- `src/components/AdGateProvider.tsx` wraps the app in layout.tsx.
+
+## Styling
+
+- Tailwind CSS only — no CSS modules, no styled-components
+- Color scheme: indigo-600 primary, gray-900 text, amber-500 for favorites, red for destructive
+- Use `text-[10px]` and `text-xs` for metadata, `text-sm` for body content
+- Responsive is NOT a priority — designed for desktop (420px sidebar + map)
+
+## Ad Gate Integration
+
+Gate important actions with `useAdGate()`:
+
+```typescript
+const { requireAd } = useAdGate();
+
+async function handleSomething() {
+  await requireAd(); // shows ad if cooldown expired, else resolves instantly
+  // ... actual logic
+}
+```
+
+Only gate high-value actions (optimize, upload, join, delete route, create session). Never gate rapid toggles, settings changes, or navigation.
+
+## Map (Leaflet)
+
+- MapView accepts houses, routes, members, preferences, and renders markers + polylines
+- Markers use colored circles (divIcon), not default pin markers
+- Route geometry comes from OSRM and is stored as `[lat, lng][][]` in the route record
