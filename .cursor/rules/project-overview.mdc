@@ -1,0 +1,51 @@
+---
+description: Project architecture and conventions for Open House Router
+alwaysApply: true
+---
+
+# Open House Router
+
+Next.js 14 App Router app with TypeScript, Tailwind CSS, and SQLite (better-sqlite3).
+
+## Architecture
+
+- **Frontend**: React client components with SWR for data fetching (5s polling)
+- **Backend**: Next.js API routes (App Router `route.ts` handlers)
+- **Database**: SQLite via `better-sqlite3` (synchronous, file-based at `data/open-house.db`)
+- **Maps**: Leaflet + OpenStreetMap tiles (dynamically imported, no SSR)
+- **Routing**: OSRM public demo server (`router.project-osrm.org`) for travel matrices and geometry
+- **Geocoding**: Nominatim (`nominatim.openstreetmap.org`)
+- **Ads**: Gated video ad system with 10-minute cooldown via `AdGateProvider` context
+
+## Key Constraints
+
+- `better-sqlite3` is a native C++ addon — must be in `serverComponentsExternalPackages` in next.config.mjs
+- OSRM public server has rate limits — fallback to haversine estimates for >100 coordinates
+- All external APIs are free (no API keys) — OSRM, Nominatim, OpenStreetMap
+- SQLite requires persistent disk — deployed to Fly.io with a mounted volume, NOT serverless
+
+## Branching & Deployment
+
+- `main` is protected (requires PR + CI + review), auto-deploys to Fly.io on merge
+- `dev` is the working branch — feature branches PR into `dev`, then `dev` PRs into `main`
+- CI: lint + typecheck + build (GitHub Actions)
+- CD: `fly deploy --remote-only` on push to main
+
+## Project Structure
+
+```
+src/
+  app/              # Next.js App Router pages and API routes
+    api/sessions/   # All REST endpoints under /api/sessions/[id]/...
+    session/[id]/   # Main session page (single large client component)
+    page.tsx        # Home page (create/join session)
+    layout.tsx      # Root layout with AdGateProvider
+  components/       # React components
+    AdGateProvider  # Ad gate context + modal
+    MapView         # Leaflet map (dynamic import, no SSR)
+  lib/              # Server-side utilities
+    db.ts           # SQLite schema, queries, CRUD
+    optimizer.ts    # Route optimization (greedy + 2-opt)
+    osrm.ts         # OSRM API client
+  types/            # TypeScript interfaces
+```

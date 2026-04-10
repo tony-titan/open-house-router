@@ -10,10 +10,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    const { rows } = await request.json();
+    const { rows, timezone } = await request.json();
     if (!Array.isArray(rows) || rows.length === 0) {
       return NextResponse.json({ error: 'No data provided' }, { status: 400 });
     }
+
+    const tz = timezone || undefined;
 
     const houses = rows
       .filter((row: any) => {
@@ -24,8 +26,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         return !isNaN(lat) && !isNaN(lng) && start && end;
       })
       .map((row: any) => {
-        const startDate = parseRedfinDate(row['NEXT OPEN HOUSE START TIME']);
-        const endDate = parseRedfinDate(row['NEXT OPEN HOUSE END TIME']);
+        const startDate = parseRedfinDate(row['NEXT OPEN HOUSE START TIME'], tz);
+        const endDate = parseRedfinDate(row['NEXT OPEN HOUSE END TIME'], tz);
         if (!startDate || !endDate) return null;
 
         return {

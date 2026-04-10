@@ -1,0 +1,40 @@
+---
+description: SQLite database patterns and conventions
+globs: src/lib/db.ts, src/app/api/**/*.ts
+alwaysApply: false
+---
+
+# Database Conventions
+
+## SQLite via better-sqlite3
+
+All database access is **synchronous** — no `async/await` needed for queries.
+
+```typescript
+const db = getDb(); // lazy singleton, auto-creates schema
+db.prepare('SELECT * FROM houses WHERE session_id = ?').all(sessionId);
+```
+
+## Schema (6 tables)
+
+- `sessions` — top-level container (id is nanoid)
+- `houses` — open house listings tied to a session, keyed by `day_key` (YYYY-MM-DD)
+- `members` — users in a session, each with color, start location, time_per_stop
+- `routes` — optimized route per member per day, stores `route_geometry` as JSON text
+- `route_stops` — ordered stops in a route, with arrival/departure times
+- `member_house_prefs` — per-member house preferences (favorited/excluded/default)
+
+## Patterns
+
+- Use `db.transaction()` for bulk inserts
+- Use `ON CONFLICT ... DO UPDATE` for upserts (see `setPreference`)
+- When creating a new route, always delete existing route for same member+day first
+- Foreign keys are ON with CASCADE deletes
+- WAL journal mode is enabled for concurrent read performance
+
+## Adding New Tables
+
+1. Add `CREATE TABLE IF NOT EXISTS` + indexes in `initializeDb()`
+2. Add query functions below existing ones in db.ts
+3. Add TypeScript interfaces in `src/types/index.ts`
+4. During development, delete `data/open-house.db` to force schema recreation

@@ -1,0 +1,46 @@
+---
+description: Fly.io deployment and CI/CD configuration
+globs: "Dockerfile, fly.toml, .github/workflows/*.yml"
+alwaysApply: false
+---
+
+# Deployment
+
+## Fly.io
+
+- App: `open-house-router` in LAX region
+- URL: https://open-house-router.fly.dev
+- Machine: shared-cpu-1x, 1GB RAM, auto-stop when idle
+- Storage: 1GB persistent volume mounted at `/app/data` for SQLite
+
+## Docker Build
+
+Multi-stage Dockerfile:
+1. `deps` — installs npm packages with native build tools (python3, make, g++) for better-sqlite3
+2. `builder` — copies deps, runs `next build` (standalone output)
+3. `runner` — copies standalone output, rebuilds better-sqlite3 for target platform
+
+The `output: 'standalone'` setting in next.config.mjs is required for the Docker build.
+
+## Environment Variables
+
+| Variable | Dev | Production | Purpose |
+|----------|-----|------------|---------|
+| `NODE_ENV` | development | production | Standard Node env |
+| `NEXT_PUBLIC_ADS_ENABLED` | false | true | Controls ad gate (client-side) |
+
+Production env vars are set in `fly.toml` under `[env]`. Dev env vars are in `.env.development`.
+
+## CI/CD (GitHub Actions)
+
+- **CI** (`ci.yml`): lint + typecheck + build — runs on PRs to main/dev and pushes to dev
+- **Deploy** (`deploy.yml`): CI + `flyctl deploy --remote-only` — runs on push to main
+- `FLY_API_TOKEN` is stored as a GitHub repo secret
+
+## Manual Deploy
+
+```bash
+fly deploy        # from project root (uses Dockerfile + fly.toml)
+fly logs          # tail production logs
+fly ssh console   # SSH into the running machine
+```

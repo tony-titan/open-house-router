@@ -1,0 +1,42 @@
+---
+description: Route optimization algorithm and OSRM integration
+globs: "src/lib/optimizer.ts, src/lib/osrm.ts"
+alwaysApply: false
+---
+
+# Route Optimization
+
+## Algorithm (optimizer.ts)
+
+Two-phase approach:
+1. **Greedy nearest-neighbor** — picks next house by score: travel time, wait time, urgency (closing window), and favorite bonus (+100)
+2. **2-opt local search** — swaps segments to reduce total travel time (max 20 iterations, only for 2-30 stops)
+
+Time windows are critical: each house has `open_house_start` and `open_house_end`. A house can only be visited during its window. The algorithm skips houses whose window has closed by the time the user could arrive.
+
+## OSRM (osrm.ts)
+
+- `getTimeMatrix(coords)` — returns NxN duration/distance matrix via OSRM Table API
+- `getRouteGeometry(coords)` — returns driving polyline via OSRM Route API
+- Fallback: haversine distance with 1.4x detour factor at 30mph for >100 coords or API failure
+- OSRM coords are `[lng, lat]` (reversed from our `[lat, lng]` convention) — the functions handle the conversion
+
+## Performance
+
+- All time comparisons use milliseconds (pre-calculated) to avoid Date object creation in hot loops
+- Route geometry is only fetched for routes with <=25 stops
+- OSRM table API is limited to 100 coordinates
+
+## Key Types
+
+```typescript
+interface CandidateInfo {
+  house: House;
+  index: number;
+  startMs: number;   // open house start in epoch ms
+  endMs: number;     // open house end in epoch ms
+  isFavorited: boolean;
+}
+```
+
+Excluded houses and houses claimed by other team members are filtered out before optimization begins.

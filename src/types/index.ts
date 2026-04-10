@@ -111,7 +111,7 @@ export function formatDayKey(dayKey: string): string {
   return `${days[date.getDay()]}, ${months[date.getMonth()]} ${day}`;
 }
 
-export function parseRedfinDate(dateStr: string): Date | null {
+export function parseRedfinDate(dateStr: string, timezone?: string): Date | null {
   if (!dateStr || dateStr.trim() === '') return null;
 
   const monthMap: Record<string, number> = {
@@ -139,7 +139,28 @@ export function parseRedfinDate(dateStr: string): Date | null {
   if (ampm === 'PM' && hours !== 12) hours += 12;
   if (ampm === 'AM' && hours === 12) hours = 0;
 
-  return new Date(parseInt(yearStr, 10), month, parseInt(dayStr, 10), hours, minutes);
+  const year = parseInt(yearStr, 10);
+  const day = parseInt(dayStr, 10);
+
+  if (!timezone) {
+    return new Date(year, month, day, hours, minutes);
+  }
+
+  // Build a naive ISO string and compute the UTC offset for the given timezone
+  const naive = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+  const asUtc = new Date(naive + 'Z');
+  const tzParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(asUtc);
+  const p: Record<string, string> = {};
+  for (const part of tzParts) p[part.type] = part.value;
+  const h = p.hour === '24' ? '00' : p.hour;
+  const localRendered = new Date(`${p.year}-${p.month}-${p.day}T${h}:${p.minute}:${p.second}Z`);
+  const offsetMs = localRendered.getTime() - asUtc.getTime();
+  return new Date(asUtc.getTime() - offsetMs);
 }
 
 export function formatTime(dateStr: string): string {
