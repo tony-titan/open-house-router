@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# SQLite database files
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Environment
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Fly.io generated
+dbsetup.js
