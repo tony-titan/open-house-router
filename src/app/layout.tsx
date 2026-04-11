@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Script from 'next/script';
 import { Inter } from 'next/font/google';
 import AdGateProvider from '@/components/AdGateProvider';
 import CookieConsent from '@/components/CookieConsent';
@@ -25,10 +24,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           crossOrigin=""
         />
         {adsenseId && (
-          <Script
+          <script
+            async
             src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseId}`}
             crossOrigin="anonymous"
-            strategy="beforeInteractive"
           />
         )}
       </head>
