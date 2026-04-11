@@ -39,6 +39,8 @@ export default function SessionPage() {
   const [sortBy, setSortBy] = useState<'time' | 'price-asc' | 'price-desc' | 'address'>('time');
   const [highlightHouseId, setHighlightHouseId] = useState<number | null>(null);
   const [showExcluded, setShowExcluded] = useState(false);
+  const [mobileView, setMobileView] = useState<'panel' | 'map'>('panel');
+  const [expandedRouteId, setExpandedRouteId] = useState<number | null>(null);
   const [timezone, setTimezone] = useState(() => {
     try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'America/Los_Angeles'; }
   });
@@ -436,6 +438,17 @@ export default function SessionPage() {
     return stop ? stop.stop_order : null;
   }
 
+  function directionsUrl(lat: number, lng: number): string {
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  }
+
+  function fullRouteUrl(route: typeof currentDayRoute): string {
+    if (!route || route.stops.length === 0) return '#';
+    const start = startLocation ? `${startLocation.lat},${startLocation.lng}` : '';
+    const waypoints = route.stops.map((s) => `${s.house.latitude},${s.house.longitude}`);
+    return `https://www.google.com/maps/dir/${start ? start + '/' : ''}${waypoints.join('/')}`;
+  }
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
@@ -457,11 +470,11 @@ export default function SessionPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto max-w-[50%] md:max-w-none">
           {data?.members?.map((m) => (
             <div
               key={m.id}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap"
               style={{
                 background: `${m.color}15`,
                 color: m.color,
@@ -483,9 +496,9 @@ export default function SessionPage() {
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}
-        <aside className="w-[420px] border-r border-gray-200 bg-white flex flex-col overflow-hidden flex-shrink-0">
+        <aside className={`w-full md:w-[420px] border-r border-gray-200 bg-white flex-col overflow-hidden flex-shrink-0 ${mobileView === 'panel' ? 'flex' : 'hidden md:flex'}`}>
           {/* Tabs */}
           <div className="flex border-b border-gray-200 flex-shrink-0">
             <button
@@ -533,7 +546,7 @@ export default function SessionPage() {
         </aside>
 
         {/* Map */}
-        <main className="flex-1 relative">
+        <main className={`flex-1 relative ${mobileView === 'map' ? 'block' : 'hidden md:block'}`}>
           {data?.houses ? (
             <MapView
               houses={data.houses}
@@ -559,8 +572,8 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* Legend */}
-          <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 text-xs space-y-1.5 z-10">
+          {/* Legend — hidden on mobile */}
+          <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 text-xs space-y-1.5 z-10 hidden md:block">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow" />
               <span>Available</span>
@@ -585,6 +598,28 @@ export default function SessionPage() {
             ))}
           </div>
         </main>
+
+        {/* Mobile view toggle */}
+        <button
+          onClick={() => setMobileView(mobileView === 'panel' ? 'map' : 'panel')}
+          className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-full shadow-lg shadow-indigo-300/50 flex items-center gap-2"
+        >
+          {mobileView === 'panel' ? (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path fillRule="evenodd" d="M8.157 2.176a1.5 1.5 0 00-1.147 0l-4.084 1.69A1.5 1.5 0 002 5.25v10.877a1.5 1.5 0 002.074 1.386l3.51-1.452 4.26 1.762a1.5 1.5 0 001.146 0l4.084-1.69A1.5 1.5 0 0018 14.75V3.872a1.5 1.5 0 00-2.073-1.386l-3.51 1.452-4.26-1.762zM7.58 5a.75.75 0 01.75.75v6.5a.75.75 0 01-1.5 0v-6.5A.75.75 0 017.58 5zm5.59 2.75a.75.75 0 00-1.5 0v6.5a.75.75 0 001.5 0v-6.5z" clipRule="evenodd" />
+              </svg>
+              Show Map
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path fillRule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5A.75.75 0 012 10z" clipRule="evenodd" />
+              </svg>
+              Show Panel
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
@@ -794,6 +829,20 @@ export default function SessionPage() {
               </button>
             </div>
 
+            {currentDayRoute.stops.length <= 25 && (
+              <a
+                href={fullRouteUrl(currentDayRoute)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 mb-3 px-3 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <path fillRule="evenodd" d="M8.157 2.176a1.5 1.5 0 00-1.147 0l-4.084 1.69A1.5 1.5 0 002 5.25v10.877a1.5 1.5 0 002.074 1.386l3.51-1.452 4.26 1.762a1.5 1.5 0 001.146 0l4.084-1.69A1.5 1.5 0 0018 14.75V3.872a1.5 1.5 0 00-2.073-1.386l-3.51 1.452-4.26-1.762zM7.58 5a.75.75 0 01.75.75v6.5a.75.75 0 01-1.5 0v-6.5A.75.75 0 017.58 5zm5.59 2.75a.75.75 0 00-1.5 0v6.5a.75.75 0 001.5 0v-6.5z" clipRule="evenodd" />
+                </svg>
+                Open Full Route in Maps
+              </a>
+            )}
+
             <div className="space-y-0">
               {currentDayRoute.stops.map((stop) => {
                 const arrival = new Date(stop.arrival_time);
@@ -816,6 +865,17 @@ export default function SessionPage() {
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           {pref === 'favorited' && <span className="text-amber-500 text-xs">★</span>}
+                          <a
+                            href={directionsUrl(stop.house.latitude, stop.house.longitude)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-green-500 hover:text-green-700"
+                            title="Get directions"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                              <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.145 15.49 15.49 0 002.004-1.3c1.326-1.003 3.381-2.898 3.381-5.477 0-3.037-2.462-5.5-5.5-5.5S5 8.963 5 12c0 2.579 2.055 4.474 3.381 5.477a15.49 15.49 0 002.004 1.3 8.893 8.893 0 00.281.146l.018.008.006.003zM10 13a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                            </svg>
+                          </a>
                           {stop.house.url && (
                             <a href={stop.house.url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-600">
                               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
@@ -871,7 +931,7 @@ export default function SessionPage() {
           </section>
         )}
 
-        {/* Team Routes Summary */}
+        {/* Team Routes Summary — expandable */}
         {data?.routes && data.routes.length > 0 && (
           <section>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">All Team Routes</h3>
@@ -879,17 +939,103 @@ export default function SessionPage() {
               {data.routes.map((route) => {
                 const member = data.members?.find((m) => m.id === route.member_id);
                 if (!member) return null;
+                const isExpanded = expandedRouteId === route.id;
                 return (
-                  <div
-                    key={route.id}
-                    className="flex items-center justify-between p-2.5 rounded-lg border border-gray-100"
-                    style={{ borderLeftColor: member.color, borderLeftWidth: 3 }}
-                  >
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">{member.name}</span>
-                      <span className="text-xs text-gray-400 ml-2">{formatDayKey(route.day_date)}</span>
-                    </div>
-                    <span className="text-xs font-medium text-gray-500">{route.stops.length} stops</span>
+                  <div key={route.id}>
+                    <button
+                      onClick={() => setExpandedRouteId(isExpanded ? null : route.id)}
+                      className="w-full flex items-center justify-between p-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 transition text-left"
+                      style={{ borderLeftColor: member.color, borderLeftWidth: 3 }}
+                    >
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">{member.name}</span>
+                        <span className="text-xs text-gray-400 ml-2">{formatDayKey(route.day_date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-500">{route.stops.length} stops</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </button>
+                    {isExpanded && route.stops.length > 0 && (
+                      <div className="mt-2 ml-1">
+                        {route.stops.length <= 25 && (
+                          <a
+                            href={fullRouteUrl(route)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 mb-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                              <path fillRule="evenodd" d="M8.157 2.176a1.5 1.5 0 00-1.147 0l-4.084 1.69A1.5 1.5 0 002 5.25v10.877a1.5 1.5 0 002.074 1.386l3.51-1.452 4.26 1.762a1.5 1.5 0 001.146 0l4.084-1.69A1.5 1.5 0 0018 14.75V3.872a1.5 1.5 0 00-2.073-1.386l-3.51 1.452-4.26-1.762zM7.58 5a.75.75 0 01.75.75v6.5a.75.75 0 01-1.5 0v-6.5A.75.75 0 017.58 5zm5.59 2.75a.75.75 0 00-1.5 0v6.5a.75.75 0 001.5 0v-6.5z" clipRule="evenodd" />
+                            </svg>
+                            Open Full Route in Maps
+                          </a>
+                        )}
+                        <div className="space-y-0">
+                          {route.stops.map((stop) => {
+                            const arrival = new Date(stop.arrival_time);
+                            const departure = new Date(stop.departure_time);
+                            return (
+                              <div key={stop.id} className="relative pl-8 pb-3">
+                                <div className="absolute left-3 top-0 bottom-0 w-0.5" style={{ background: `${member.color}40` }} />
+                                <div
+                                  className="absolute left-1 top-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                                  style={{ background: member.color }}
+                                >
+                                  {stop.stop_order}
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-2.5">
+                                  <div className="flex items-start justify-between gap-1">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 truncate">{stop.house.address}</p>
+                                      <p className="text-xs text-gray-500">{stop.house.city} — ${stop.house.price?.toLocaleString()}</p>
+                                    </div>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      <a
+                                        href={directionsUrl(stop.house.latitude, stop.house.longitude)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-green-500 hover:text-green-700"
+                                        title="Get directions"
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                          <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.145 15.49 15.49 0 002.004-1.3c1.326-1.003 3.381-2.898 3.381-5.477 0-3.037-2.462-5.5-5.5-5.5S5 8.963 5 12c0 2.579 2.055 4.474 3.381 5.477a15.49 15.49 0 002.004 1.3 8.893 8.893 0 00.281.146l.018.008.006.003zM10 13a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                                        </svg>
+                                      </a>
+                                      {stop.house.url && (
+                                        <a href={stop.house.url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-600">
+                                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                            <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clipRule="evenodd" />
+                                            <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clipRule="evenodd" />
+                                          </svg>
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-1 text-xs">
+                                    <span className="font-medium" style={{ color: member.color }}>
+                                      {arrival.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                      {' \u2192 '}
+                                      {departure.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                    </span>
+                                    {stop.travel_time_minutes > 0 && (
+                                      <span className="text-gray-400">{Math.round(stop.travel_time_minutes)} min drive</span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-gray-400 mt-0.5">
+                                    Open house: {new Date(stop.house.open_house_start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                    {' \u2013 '}
+                                    {new Date(stop.house.open_house_end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
