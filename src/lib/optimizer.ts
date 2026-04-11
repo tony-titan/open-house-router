@@ -1,5 +1,5 @@
 import { House } from '@/types';
-import { getTimeMatrix, getRouteGeometry } from './osrm';
+import { getTimeMatrix, getRouteGeometry, getTrafficMultiplier } from './osrm';
 
 interface OptimizationInput {
   houses: House[];
@@ -11,6 +11,7 @@ interface OptimizationInput {
   excludeHouseIds: number[];
   claimedHouseIds?: number[];
   favoritedHouseIds?: number[];
+  isWeekend?: boolean;
 }
 
 interface PlannedStop {
@@ -37,7 +38,7 @@ interface CandidateInfo {
 }
 
 export async function optimizeRoute(input: OptimizationInput): Promise<OptimizationResult> {
-  const { houses, startLat, startLng, dayStartTime, dayEndTime, timePerStopMinutes, excludeHouseIds, claimedHouseIds, favoritedHouseIds } = input;
+  const { houses, startLat, startLng, dayStartTime, dayEndTime, timePerStopMinutes, excludeHouseIds, claimedHouseIds, favoritedHouseIds, isWeekend: isWeekendInput } = input;
 
   const excludeSet = new Set(excludeHouseIds);
   const claimedSet = new Set(claimedHouseIds || []);
@@ -45,6 +46,7 @@ export async function optimizeRoute(input: OptimizationInput): Promise<Optimizat
   const dayStartMs = dayStartTime.getTime();
   const dayEndMs = dayEndTime.getTime();
   const stopMs = timePerStopMinutes * 60 * 1000;
+  const weekend = isWeekendInput ?? (dayStartTime.getDay() === 0 || dayStartTime.getDay() === 6);
 
   const MAX_WINDOW_MS = 8 * 60 * 60 * 1000; // 8 hours
 
@@ -71,10 +73,10 @@ export async function optimizeRoute(input: OptimizationInput): Promise<Optimizat
   const matrix = await getTimeMatrix(allCoords);
   const durationsMs = matrix.durations.map((row) => row.map((d) => d * 1000));
 
-  const route = greedyOptimize(candidates, durationsMs, dayStartMs, dayEndMs, stopMs);
+  const route = greedyOptimize(candidates, durationsMs, dayStartMs, dayEndMs, stopMs, weekend);
 
   const improved = route.length > 2 && route.length <= 30
-    ? twoOptImprove(route, candidates, durationsMs, dayStartMs, stopMs, dayEndMs)
+    ? twoOptImprove(route, candidates, durationsMs, dayStartMs, stopMs, dayEndMs, weekend)
     : route;
 
   let totalTravelMinutes = 0;
@@ -85,7 +87,8 @@ export async function optimizeRoute(input: OptimizationInput): Promise<Optimizat
   for (const candIdx of improved) {
     const cand = candidates[candIdx];
     const matrixIdx = candIdx + 1;
-    const travelMs = durationsMs[currentIndex][matrixIdx];
+    const multiplier = getTrafficMultiplier(currentTimeMs, weekend);
+    const travelMs = durationsMs[currentIndex][matrixIdx] * multiplier;
     const travelMinutes = travelMs / 60000;
 
     const arrivalMs = currentTimeMs + travelMs;
@@ -130,7 +133,8 @@ function greedyOptimize(
   durationsMs: number[][],
   dayStartMs: number,
   dayEndMs: number,
-  stopMs: number
+  stopMs: number,
+  isWeekend: boolean
 ): number[] {
   const n = candidates.length;
   const visited = new Set<number>();
@@ -141,13 +145,14 @@ function greedyOptimize(
   while (visited.size < n) {
     let bestScore = -Infinity;
     let bestCandidate = -1;
+    const multiplier = getTrafficMultiplier(currentTimeMs, isWeekend);
 
     for (let i = 0; i < n; i++) {
       if (visited.has(i)) continue;
 
       const cand = candidates[i];
       const matrixIdx = i + 1;
-      const travelMs = durationsMs[currentIdx][matrixIdx];
+      const travelMs = durationsMs[currentIdx][matrixIdx] * multiplier;
       const arrivalMs = currentTimeMs + travelMs;
 
       if (arrivalMs >= cand.endMs) continue;
@@ -183,7 +188,7 @@ function greedyOptimize(
 
     const cand = candidates[bestCandidate];
     const matrixIdx = bestCandidate + 1;
-    const travelMs = durationsMs[currentIdx][matrixIdx];
+    const travelMs = durationsMs[currentIdx][matrixIdx] * multiplier;
     const arrivalMs = currentTimeMs + travelMs;
     const effectiveArrivalMs = Math.max(arrivalMs, cand.startMs);
 
@@ -200,7 +205,8 @@ function twoOptImprove(
   durationsMs: number[][],
   dayStartMs: number,
   stopMs: number,
-  dayEndMs: number
+  dayEndMs: number,
+  isWeekend: boolean
 ): number[] {
   let best = [...route];
   let improved = true;
@@ -217,7 +223,7 @@ function twoOptImprove(
         const segment = newRoute.slice(i, j + 1).reverse();
         newRoute.splice(i, j - i + 1, ...segment);
 
-        if (isRouteFeasible(newRoute, candidates, durationsMs, dayStartMs, stopMs, dayEndMs)) {
+        if (isRouteFeasible(newRoute, candidates, durationsMs, dayStartMs, stopMs, dayEndMs, isWeekend)) {
           const oldCost = routeTravelTime(best, durationsMs);
           const newCost = routeTravelTime(newRoute, durationsMs);
           if (newCost < oldCost) {
@@ -248,7 +254,8 @@ function isRouteFeasible(
   durationsMs: number[][],
   dayStartMs: number,
   stopMs: number,
-  dayEndMs: number
+  dayEndMs: number,
+  isWeekend: boolean
 ): boolean {
   let currentTimeMs = dayStartMs;
   let currentIdx = 0;
@@ -256,7 +263,8 @@ function isRouteFeasible(
   for (const candIdx of route) {
     const cand = candidates[candIdx];
     const matrixIdx = candIdx + 1;
-    const travelMs = durationsMs[currentIdx][matrixIdx];
+    const multiplier = getTrafficMultiplier(currentTimeMs, isWeekend);
+    const travelMs = durationsMs[currentIdx][matrixIdx] * multiplier;
     const arrivalMs = currentTimeMs + travelMs;
 
     if (arrivalMs >= cand.endMs) return false;
