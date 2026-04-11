@@ -111,14 +111,30 @@ export function formatDayKey(dayKey: string): string {
   return `${days[date.getDay()]}, ${months[date.getMonth()]} ${day}`;
 }
 
+const MONTH_MAP: Record<string, number> = {
+  January: 0, February: 1, March: 2, April: 3,
+  May: 4, June: 5, July: 6, August: 7,
+  September: 8, October: 9, November: 10, December: 11,
+};
+
+const dtfCache = new Map<string, Intl.DateTimeFormat>();
+
+function getCachedDTF(tz: string): Intl.DateTimeFormat {
+  let dtf = dtfCache.get(tz);
+  if (!dtf) {
+    dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+    dtfCache.set(tz, dtf);
+  }
+  return dtf;
+}
+
 export function parseRedfinDate(dateStr: string, timezone?: string): Date | null {
   if (!dateStr || dateStr.trim() === '') return null;
-
-  const monthMap: Record<string, number> = {
-    January: 0, February: 1, March: 2, April: 3,
-    May: 4, June: 5, July: 6, August: 7,
-    September: 8, October: 9, November: 10, December: 11,
-  };
 
   const parts = dateStr.trim().split(' ');
   if (parts.length < 3) return null;
@@ -130,7 +146,7 @@ export function parseRedfinDate(dateStr: string, timezone?: string): Date | null
   const [monthStr, dayStr, yearStr] = datePieces;
   const [hourStr, minStr] = timePart.split(':');
 
-  const month = monthMap[monthStr];
+  const month = MONTH_MAP[monthStr];
   if (month === undefined) return null;
 
   let hours = parseInt(hourStr, 10);
@@ -146,15 +162,10 @@ export function parseRedfinDate(dateStr: string, timezone?: string): Date | null
     return new Date(year, month, day, hours, minutes);
   }
 
-  // Build a naive ISO string and compute the UTC offset for the given timezone
   const naive = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
   const asUtc = new Date(naive + 'Z');
-  const tzParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false,
-  }).formatToParts(asUtc);
+  const dtf = getCachedDTF(timezone);
+  const tzParts = dtf.formatToParts(asUtc);
   const p: Record<string, string> = {};
   for (const part of tzParts) p[part.type] = part.value;
   const h = p.hour === '24' ? '00' : p.hour;
