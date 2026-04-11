@@ -43,8 +43,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const dayStart = new Date(day_start_time);
     const dayEnd = new Date(day_end_time);
+    const dayOfWeek = dayStart.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-    console.log(`[optimize] Day ${day_date}: ${houses.length} houses, window ${dayStart.toISOString()} – ${dayEnd.toISOString()}, stop=${member.time_per_stop || 5}min`);
+    console.log(`[optimize] Day ${day_date} (${isWeekend ? 'weekend' : 'weekday'}): ${houses.length} houses, window ${dayStart.toISOString()} – ${dayEnd.toISOString()}, stop=${member.time_per_stop || 5}min`);
 
     const result = await optimizeRoute({
       houses,
@@ -56,6 +58,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       excludeHouseIds: excludedIds,
       claimedHouseIds: claimedIds,
       favoritedHouseIds: favoritedIds,
+      isWeekend,
     });
 
     for (const stop of result.stops) {

@@ -70,6 +70,38 @@ export async function getRouteGeometry(coords: [number, number][]): Promise<[num
   }
 }
 
+/**
+ * Traffic multiplier based on typical US metro patterns.
+ * Applied to OSRM free-flow durations to approximate real travel times.
+ * @param timeMs  UTC timestamp of when the drive occurs
+ * @param isWeekend  true for Saturday/Sunday
+ */
+export function getTrafficMultiplier(timeMs: number, isWeekend: boolean): number {
+  const d = new Date(timeMs);
+  const hour = d.getHours() + d.getMinutes() / 60;
+
+  if (isWeekend) {
+    if (hour < 6)  return 1.00;
+    if (hour < 9)  return 1.05;
+    if (hour < 11) return 1.10;
+    if (hour < 13) return 1.15;
+    if (hour < 16) return 1.10;
+    if (hour < 19) return 1.15;
+    if (hour < 21) return 1.05;
+    return 1.00;
+  }
+
+  // Weekday
+  if (hour < 6)  return 1.00;
+  if (hour < 9)  return 1.45;
+  if (hour < 11) return 1.15;
+  if (hour < 13) return 1.10;
+  if (hour < 16) return 1.15;
+  if (hour < 19) return 1.50;
+  if (hour < 21) return 1.10;
+  return 1.00;
+}
+
 function estimateMatrix(coords: [number, number][]): DurationMatrix {
   const AVG_SPEED_MPS = 13.4; // ~30 mph in m/s for suburban driving
   const DETOUR_FACTOR = 1.4;
