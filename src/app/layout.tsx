@@ -1,9 +1,13 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Inter } from 'next/font/google';
 import AdGateProvider from '@/components/AdGateProvider';
+import CookieConsent from '@/components/CookieConsent';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
+
+const adsenseId = process.env.NEXT_PUBLIC_ADSENSE_ID;
 
 export const metadata: Metadata = {
   title: 'Open House Router',
@@ -23,6 +27,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={inter.className}>
         <AdGateProvider>{children}</AdGateProvider>
+        <CookieConsent />
+        {adsenseId && (
+          <Script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseId}`}
+            crossOrigin="anonymous"
+            strategy="afterInteractive"
+          />
+        )}
       </body>
     </html>
   );

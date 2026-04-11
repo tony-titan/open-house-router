@@ -1,11 +1,22 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import VideoAd from './VideoAd';
 
 const COOLDOWN_MS = 10 * 60 * 1000;
 const AD_DURATION_SECONDS = 15;
 const STORAGE_KEY = 'ad_cooldown_ts';
 const DEV_TOGGLE_KEY = 'ad_dev_toggle';
+
+const SPONSOR_NAME = process.env.NEXT_PUBLIC_SPONSOR_NAME || '';
+const SPONSOR_LOGO = process.env.NEXT_PUBLIC_SPONSOR_LOGO || '';
+const SPONSOR_URL = process.env.NEXT_PUBLIC_SPONSOR_URL || '';
+const SPONSOR_VIDEO = process.env.NEXT_PUBLIC_SPONSOR_VIDEO || '';
+const AD_MANAGER_TAG = process.env.NEXT_PUBLIC_AD_MANAGER_TAG || '';
+const HAS_SPONSOR = !!(SPONSOR_NAME && SPONSOR_URL);
+const HAS_VIDEO_ADS = !!AD_MANAGER_TAG;
+
+type AdCreative = 'sponsor' | 'video' | 'fallback';
 
 interface AdGateContextValue {
   requireAd: () => Promise<void>;
@@ -23,7 +34,6 @@ function useAdsEnabled(): [boolean, (v: boolean) => void] {
   const isDev = process.env.NODE_ENV === 'development';
   const envFlag = process.env.NEXT_PUBLIC_ADS_ENABLED !== 'false';
 
-  // Always start with a server-safe default, then sync from localStorage after mount
   const [devOverride, setDevOverride] = useState<boolean>(isDev ? false : envFlag);
 
   useEffect(() => {
@@ -43,12 +53,20 @@ function useAdsEnabled(): [boolean, (v: boolean) => void] {
   return [devOverride, setEnabled];
 }
 
+function resolveCreativeType(): AdCreative {
+  if (HAS_SPONSOR) return 'sponsor';
+  if (HAS_VIDEO_ADS) return 'video';
+  return 'fallback';
+}
+
 export default function AdGateProvider({ children }: { children: React.ReactNode }) {
   const isDev = process.env.NODE_ENV === 'development';
   const [adsEnabled, setAdsEnabled] = useAdsEnabled();
 
   const [visible, setVisible] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(AD_DURATION_SECONDS);
+  const [creative, setCreative] = useState<AdCreative>('fallback');
+  const [videoFinished, setVideoFinished] = useState(false);
   const resolveRef = useRef<(() => void) | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -74,12 +92,18 @@ export default function AdGateProvider({ children }: { children: React.ReactNode
     return new Promise<void>((resolve) => {
       resolveRef.current = resolve;
       setSecondsLeft(AD_DURATION_SECONDS);
+      setVideoFinished(false);
+      setCreative(resolveCreativeType());
       setVisible(true);
     });
   }, [adsEnabled]);
 
   useEffect(() => {
     if (!visible) return;
+
+    // For video ads served by IMA, the timer is not used — completion
+    // is driven by the onComplete callback from the VideoAd component.
+    if (creative === 'video' && !videoFinished) return;
 
     timerRef.current = setInterval(() => {
       setSecondsLeft((prev) => {
@@ -94,7 +118,7 @@ export default function AdGateProvider({ children }: { children: React.ReactNode
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [visible]);
+  }, [visible, creative, videoFinished]);
 
   function handleComplete() {
     markAdCompleted();
@@ -103,13 +127,25 @@ export default function AdGateProvider({ children }: { children: React.ReactNode
     resolveRef.current = null;
   }
 
-  const progress = ((AD_DURATION_SECONDS - secondsLeft) / AD_DURATION_SECONDS) * 100;
+  function handleVideoComplete() {
+    setVideoFinished(true);
+    setSecondsLeft(0);
+  }
+
+  function handleVideoError() {
+    // Video ad failed to load — fall back to timer-only interstitial
+    setCreative('fallback');
+  }
+
+  const showTimer = creative !== 'video' || videoFinished;
+  const progress = showTimer
+    ? ((AD_DURATION_SECONDS - secondsLeft) / AD_DURATION_SECONDS) * 100
+    : 0;
 
   return (
     <AdGateContext.Provider value={{ requireAd }}>
       {children}
 
-      {/* Dev toggle — only rendered in development */}
       {isDev && (
         <button
           onClick={() => setAdsEnabled(!adsEnabled)}
@@ -135,29 +171,86 @@ export default function AdGateProvider({ children }: { children: React.ReactNode
                     <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.432z" />
                   </svg>
                 </div>
-                <h2 className="text-xl font-bold text-white mb-1">A word from our sponsor</h2>
+                <h2 className="text-xl font-bold text-white mb-1">
+                  {creative === 'sponsor' ? `Sponsored by ${SPONSOR_NAME}` : 'A word from our sponsor'}
+                </h2>
                 <p className="text-sm text-gray-400">
                   This free tool is supported by ads
                 </p>
               </div>
 
-              {/* Placeholder ad area — replace with real ad SDK */}
-              <div className="bg-gray-700/50 rounded-xl aspect-video flex items-center justify-center mb-6 border border-gray-600/30">
-                <div className="text-center">
-                  <p className="text-gray-500 text-xs uppercase tracking-widest mb-2">Advertisement</p>
-                  <p className="text-gray-400 text-sm">Video ad plays here</p>
+              {/* --- Ad creative area --- */}
+              {creative === 'sponsor' && (
+                <a
+                  href={SPONSOR_URL}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  className="block mb-6 group"
+                >
+                  {SPONSOR_VIDEO ? (
+                    <video
+                      src={SPONSOR_VIDEO}
+                      autoPlay
+                      muted
+                      playsInline
+                      className="rounded-xl w-full aspect-video object-cover"
+                    />
+                  ) : SPONSOR_LOGO ? (
+                    <div className="bg-gray-700/50 rounded-xl aspect-video flex items-center justify-center border border-gray-600/30 group-hover:border-indigo-500/50 transition">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={SPONSOR_LOGO}
+                        alt={SPONSOR_NAME}
+                        className="max-h-24 max-w-[80%] object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-gray-700/50 rounded-xl aspect-video flex items-center justify-center border border-gray-600/30 group-hover:border-indigo-500/50 transition">
+                      <span className="text-2xl font-bold text-white/80">{SPONSOR_NAME}</span>
+                    </div>
+                  )}
+                  <p className="text-indigo-400 text-xs mt-2 group-hover:underline">
+                    Visit {SPONSOR_NAME} &rarr;
+                  </p>
+                </a>
+              )}
+
+              {creative === 'video' && !videoFinished && (
+                <div className="mb-6">
+                  <VideoAd onComplete={handleVideoComplete} onError={handleVideoError} />
                 </div>
-              </div>
+              )}
 
-              {/* Progress bar */}
-              <div className="w-full bg-gray-700 rounded-full h-1.5 mb-4 overflow-hidden">
-                <div
-                  className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-linear"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+              {creative === 'video' && videoFinished && (
+                <div className="bg-gray-700/50 rounded-xl aspect-video flex items-center justify-center mb-6 border border-gray-600/30">
+                  <p className="text-gray-400 text-sm">Thanks for watching!</p>
+                </div>
+              )}
 
-              {secondsLeft > 0 ? (
+              {creative === 'fallback' && (
+                <div className="bg-gray-700/50 rounded-xl aspect-video flex items-center justify-center mb-6 border border-gray-600/30">
+                  <div className="text-center">
+                    <p className="text-gray-500 text-xs uppercase tracking-widest mb-2">Advertisement</p>
+                    <p className="text-gray-400 text-sm">Supporting Open House Router</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Progress bar — hidden during IMA video playback */}
+              {showTimer && (
+                <div className="w-full bg-gray-700 rounded-full h-1.5 mb-4 overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-linear"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              )}
+
+              {creative === 'video' && !videoFinished ? (
+                <p className="text-sm text-gray-400">
+                  Ad playing...
+                </p>
+              ) : secondsLeft > 0 ? (
                 <p className="text-sm text-gray-400">
                   Continue in <span className="font-mono font-bold text-white">{secondsLeft}s</span>
                 </p>

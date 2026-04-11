@@ -7,6 +7,7 @@ import useSWR from 'swr';
 import Papa from 'papaparse';
 import { SessionData, House, HousePrefStatus, formatDayKey } from '@/types';
 import { useAdGate } from '@/components/AdGateProvider';
+import AdUnit from '@/components/AdUnit';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
@@ -882,6 +883,8 @@ export default function SessionPage() {
             </div>
           </section>
         )}
+
+        <AdUnit slot="SESSION_SIDEBAR" format="rectangle" className="rounded-xl overflow-hidden" />
       </div>
     );
   }
