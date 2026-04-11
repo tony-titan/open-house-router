@@ -17,6 +17,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const tz = timezone || undefined;
 
+    const MAX_OPEN_HOUSE_HOURS = 8;
+    const MIN_OPEN_HOUSE_HOUR = 6; // 6 AM — no real open house starts before this
+
     const houses = rows
       .filter((row: any) => {
         const lat = parseFloat(row['LATITUDE']);
@@ -29,6 +32,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         const startDate = parseRedfinDate(row['NEXT OPEN HOUSE START TIME'], tz);
         const endDate = parseRedfinDate(row['NEXT OPEN HOUSE END TIME'], tz);
         if (!startDate || !endDate) return null;
+
+        const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
+        if (durationHours > MAX_OPEN_HOUSE_HOURS || durationHours <= 0) return null;
+
+        const startHourUTC = startDate.getUTCHours();
+        const tzOffsetHours = tz ? getTimezoneOffsetHours(startDate, tz) : 0;
+        const localStartHour = (startHourUTC + tzOffsetHours + 24) % 24;
+        if (localStartHour < MIN_OPEN_HOUSE_HOUR) return null;
 
         return {
           address: row['ADDRESS'] || '',
@@ -61,5 +72,27 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+function getTimezoneOffsetHours(date: Date, tz: string): number {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const p: Record<string, string> = {};
+    for (const part of parts) p[part.type] = part.value;
+    const h = p.hour === '24' ? '00' : p.hour;
+    const localStr = `${p.year}-${p.month}-${p.day}T${h}:${p.minute}:00Z`;
+    const localAsUtc = new Date(localStr);
+    return (localAsUtc.getTime() - date.getTime()) / (1000 * 60 * 60);
+  } catch {
+    return 0;
   }
 }

@@ -44,6 +44,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const dayStart = new Date(day_start_time);
     const dayEnd = new Date(day_end_time);
 
+    console.log(`[optimize] Day ${day_date}: ${houses.length} houses, window ${dayStart.toISOString()} – ${dayEnd.toISOString()}, stop=${member.time_per_stop || 5}min`);
+
     const result = await optimizeRoute({
       houses,
       startLat: member.start_lat,
@@ -55,6 +57,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       claimedHouseIds: claimedIds,
       favoritedHouseIds: favoritedIds,
     });
+
+    for (const stop of result.stops) {
+      const ohStart = new Date(stop.house.open_house_start);
+      const ohEnd = new Date(stop.house.open_house_end);
+      const ok = stop.arrival_time >= ohStart && stop.departure_time <= ohEnd;
+      console.log(`[optimize]  #${result.stops.indexOf(stop) + 1} ${stop.house.address}: arrive ${stop.arrival_time.toISOString()} depart ${stop.departure_time.toISOString()} | OH ${ohStart.toISOString()}–${ohEnd.toISOString()} | ${ok ? 'OK' : 'VIOLATION'}`);
+    }
 
     const routeId = createRoute(member_id, id, day_date, day_start_time, day_end_time);
 
