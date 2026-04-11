@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdGate } from '@/components/AdGateProvider';
+import AdUnit from '@/components/AdUnit';
 
 export default function HomePage() {
   const router = useRouter();
@@ -112,8 +113,13 @@ export default function HomePage() {
           )}
         </div>
 
+        <AdUnit slot="HOME_BELOW_CARD" format="horizontal" className="mt-6 rounded-xl overflow-hidden" />
+
         <p className="text-center text-gray-400 text-xs mt-6">
           Upload a Redfin CSV, set starting locations, and generate optimized routes for your team.
+        </p>
+        <p className="text-center text-gray-300 text-[10px] mt-2">
+          <a href="/privacy" className="hover:text-gray-500 transition">Privacy Policy</a>
         </p>
       </div>
     </div>

@@ -11,6 +11,12 @@ primary_region = 'lax'
 [env]
   NEXT_PUBLIC_ADS_ENABLED = 'true'
   NODE_ENV = 'production'
+  NEXT_PUBLIC_ADSENSE_ID = 'ca-pub-6812956240892681'
+  # NEXT_PUBLIC_AD_MANAGER_TAG = 'https://pubads.g.doubleclick.net/gampad/ads?...'
+  # NEXT_PUBLIC_SPONSOR_NAME = ''
+  # NEXT_PUBLIC_SPONSOR_LOGO = ''
+  # NEXT_PUBLIC_SPONSOR_URL = ''
+  # NEXT_PUBLIC_SPONSOR_VIDEO = ''
 
 [[mounts]]
   source = 'data'

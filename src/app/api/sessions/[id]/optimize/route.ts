@@ -41,8 +41,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const excludedIds = getMemberExcludedIds(member_id);
     const favoritedIds = getMemberFavoritedIds(member_id);
 
-    const allExcluded = Array.from(new Set([...Array.from(claimedIds), ...Array.from(excludedIds)]));
-
     const dayStart = new Date(day_start_time);
     const dayEnd = new Date(day_end_time);
 
@@ -53,7 +51,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       dayStartTime: dayStart,
       dayEndTime: dayEnd,
       timePerStopMinutes: member.time_per_stop || 5,
-      excludeHouseIds: allExcluded,
+      excludeHouseIds: excludedIds,
+      claimedHouseIds: claimedIds,
       favoritedHouseIds: favoritedIds,
     });
 

@@ -7,6 +7,7 @@ import useSWR from 'swr';
 import Papa from 'papaparse';
 import { SessionData, House, HousePrefStatus, formatDayKey } from '@/types';
 import { useAdGate } from '@/components/AdGateProvider';
+import AdUnit from '@/components/AdUnit';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
@@ -514,11 +515,7 @@ export default function SessionPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto scrollbar-thin">
-            {activeTab === 'plan' ? (
-              <PlanTab />
-            ) : (
-              <HousesTab />
-            )}
+            {activeTab === 'plan' ? PlanTab() : HousesTab()}
           </div>
         </aside>
 
@@ -886,6 +883,8 @@ export default function SessionPage() {
             </div>
           </section>
         )}
+
+        <AdUnit slot="SESSION_SIDEBAR" format="rectangle" className="rounded-xl overflow-hidden" />
       </div>
     );
   }
@@ -907,9 +906,9 @@ export default function SessionPage() {
     }
 
     return (
-      <div className="flex flex-col h-full">
+      <div>
         {/* Search & filters */}
-        <div className="p-3 border-b border-gray-100 space-y-2 flex-shrink-0">
+        <div className="p-3 border-b border-gray-100 space-y-2 sticky top-0 bg-white z-10">
           <input
             type="text"
             placeholder="Search address, city, zip..."
@@ -949,7 +948,7 @@ export default function SessionPage() {
         </div>
 
         {/* House list */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <div>
           {filteredHouses.map((house) => (
             <HouseCard key={house.id} house={house} />
           ))}
