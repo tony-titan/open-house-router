@@ -75,17 +75,24 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
+const offsetDtfCache = new Map<string, Intl.DateTimeFormat>();
+
 function getTimezoneOffsetHours(date: Date, tz: string): number {
   try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(date);
+    let dtf = offsetDtfCache.get(tz);
+    if (!dtf) {
+      dtf = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      offsetDtfCache.set(tz, dtf);
+    }
+    const parts = dtf.formatToParts(date);
     const p: Record<string, string> = {};
     for (const part of parts) p[part.type] = part.value;
     const h = p.hour === '24' ? '00' : p.hour;

@@ -203,7 +203,20 @@ export default function SessionPage() {
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          const rows = results.data.filter((row: any) => row['LATITUDE'] && row['NEXT OPEN HOUSE START TIME']);
+          const UPLOAD_KEYS = [
+            'ADDRESS', 'CITY', 'STATE OR PROVINCE', 'ZIP OR POSTAL CODE',
+            'PRICE', 'BEDS', 'BATHS', 'PROPERTY TYPE', 'SQUARE FEET',
+            'LOT SIZE', 'YEAR BUILT', 'NEXT OPEN HOUSE START TIME',
+            'NEXT OPEN HOUSE END TIME', 'LATITUDE', 'LONGITUDE',
+            'URL (SEE https://www.redfin.com/buy-a-home/comparative-market-analysis FOR INFO ON PRICING)',
+          ];
+          const rows = results.data
+            .filter((row: any) => row['LATITUDE'] && row['NEXT OPEN HOUSE START TIME'])
+            .map((row: any) => {
+              const trimmed: Record<string, string> = {};
+              for (const k of UPLOAD_KEYS) if (row[k] !== undefined) trimmed[k] = row[k];
+              return trimmed;
+            });
           setStatusMessage(`Uploading ${rows.length} listings...`);
           const res = await fetch(`/api/sessions/${sessionId}/upload`, {
             method: 'POST',
