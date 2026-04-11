@@ -46,11 +46,14 @@ export async function optimizeRoute(input: OptimizationInput): Promise<Optimizat
   const dayEndMs = dayEndTime.getTime();
   const stopMs = timePerStopMinutes * 60 * 1000;
 
+  const MAX_WINDOW_MS = 8 * 60 * 60 * 1000; // 8 hours
+
   const candidates: CandidateInfo[] = [];
   houses.forEach((h, idx) => {
     if (excludeSet.has(h.id)) return;
     const hStartMs = new Date(h.open_house_start).getTime();
     const hEndMs = new Date(h.open_house_end).getTime();
+    if (hEndMs - hStartMs > MAX_WINDOW_MS || hEndMs <= hStartMs) return;
     if (hEndMs > dayStartMs && hStartMs < dayEndMs) {
       candidates.push({ house: h, index: idx, startMs: hStartMs, endMs: hEndMs, isFavorited: favoritedSet.has(h.id), isClaimed: claimedSet.has(h.id) });
     }
@@ -88,6 +91,10 @@ export async function optimizeRoute(input: OptimizationInput): Promise<Optimizat
     const arrivalMs = currentTimeMs + travelMs;
     const effectiveArrivalMs = Math.max(arrivalMs, cand.startMs);
     const departureMs = effectiveArrivalMs + stopMs;
+
+    if (effectiveArrivalMs >= cand.endMs || departureMs > cand.endMs || departureMs > dayEndMs) {
+      continue;
+    }
 
     stops.push({
       house: cand.house,
@@ -149,15 +156,19 @@ function greedyOptimize(
       const departureMs = effectiveArrivalMs + stopMs;
 
       if (departureMs > dayEndMs) continue;
+      if (departureMs > cand.endMs) continue;
 
       const waitMinutes = (effectiveArrivalMs - arrivalMs) / 60000;
       const travelMinutes = travelMs / 60000;
-      const remainingWindowMinutes = (cand.endMs - effectiveArrivalMs) / 60000;
+      const timeUntilClose = (cand.endMs - effectiveArrivalMs) / 60000;
+      const stopMinutes = stopMs / 60000;
 
-      const urgency = remainingWindowMinutes < 30 ? 2.0 : remainingWindowMinutes < 60 ? 1.0 : 0.0;
+      const coverageRatio = timeUntilClose / stopMinutes;
+      const fitScore = Math.min(coverageRatio, 3.0) * 5;
+      const urgency = timeUntilClose < 45 ? (45 - timeUntilClose) / 15 : 0;
       const favoriteBonus = cand.isFavorited ? 100 : 0;
       const claimedPenalty = cand.isClaimed ? -50 : 0;
-      const score = -travelMinutes * 1.0 - waitMinutes * 0.5 + urgency * 10 + favoriteBonus + claimedPenalty;
+      const score = -travelMinutes * 1.0 - waitMinutes * 0.5 + urgency * 10 + fitScore + favoriteBonus + claimedPenalty;
 
       if (score > bestScore) {
         bestScore = score;
@@ -253,6 +264,7 @@ function isRouteFeasible(
     const effectiveArrivalMs = Math.max(arrivalMs, cand.startMs);
     const departureMs = effectiveArrivalMs + stopMs;
     if (departureMs > dayEndMs) return false;
+    if (departureMs > cand.endMs) return false;
 
     currentTimeMs = departureMs;
     currentIdx = matrixIdx;
